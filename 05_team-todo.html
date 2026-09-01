@@ -221,7 +221,7 @@
         border: 1px solid var(--line);
         background: linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.56));
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
-        padding-bottom: 72px;
+        padding-bottom: 14px;
       }
 
       .memo-shell textarea {
@@ -230,14 +230,10 @@
       }
 
       .memo-attachment-bar {
-        position: absolute;
-        left: 14px;
-        right: 14px;
-        bottom: 14px;
         display: flex;
         align-items: center;
         gap: 10px;
-        z-index: 2;
+        margin: 12px 14px 0;
       }
 
       .memo-photo-strip {
@@ -249,6 +245,7 @@
       }
 
       .memo-photo-thumb {
+        position: relative;
         width: 46px;
         height: 46px;
         border-radius: 12px;
@@ -258,6 +255,34 @@
         box-shadow: 0 8px 18px rgba(40, 65, 120, 0.12);
         padding: 0;
         cursor: pointer;
+      }
+
+      .memo-photo-item {
+        position: relative;
+        width: 46px;
+        height: 46px;
+      }
+
+      .memo-photo-item .memo-photo-thumb {
+        width: 100%;
+        height: 100%;
+      }
+
+      .memo-photo-remove {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        width: 19px;
+        height: 19px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: #44516a;
+        color: #fff;
+        font-size: 0.72rem;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        z-index: 1;
       }
 
       .memo-photo-thumb img {
@@ -280,6 +305,81 @@
         display: grid;
         place-items: center;
         line-height: 1;
+      }
+
+      .emotion-panel {
+        margin: 18px 14px 0;
+        padding-top: 16px;
+        border-top: 1px solid rgba(104, 117, 138, 0.16);
+      }
+
+      .emotion-title {
+        margin: 0 0 12px;
+        font-size: 0.9rem;
+        color: var(--text);
+      }
+
+      .emotion-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .emotion-item {
+        display: grid;
+        grid-template-columns: 30px minmax(80px, 1fr) 42px;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .emotion-icon {
+        font-size: 1.35rem;
+        text-align: center;
+      }
+
+      .emotion-slider {
+        width: 100%;
+        height: 6px;
+        appearance: none;
+        border-radius: 999px;
+        background: linear-gradient(to right, hsl(var(--emotion-hue) 72% var(--emotion-lightness)) var(--emotion-level), rgba(79, 110, 247, 0.16) var(--emotion-level));
+        cursor: pointer;
+      }
+
+      .emotion-slider::-webkit-slider-thumb {
+        width: 16px;
+        height: 16px;
+        appearance: none;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        background: var(--primary-strong);
+        box-shadow: 0 2px 7px rgba(52, 83, 220, 0.28);
+      }
+
+      .emotion-slider::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        background: var(--primary-strong);
+        box-shadow: 0 2px 7px rgba(52, 83, 220, 0.28);
+      }
+
+      .emotion-value {
+        color: var(--primary-strong);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-align: right;
+      }
+
+      @media (max-width: 620px) {
+        .emotion-list {
+          grid-template-columns: 1fr;
+        }
+
+        .emotion-item {
+          grid-template-columns: 30px minmax(0, 1fr) 42px;
+        }
       }
 
       .memo-image-modal {
@@ -864,7 +964,7 @@
           <section class="section-card">
             <div class="section-header">
               <h3>오늘의 체크리스트</h3>
-              <button class="ghost-btn" type="button">추가</button>
+              <button class="ghost-btn" id="taskAddBtn" type="button">추가</button>
             </div>
             <ul class="checklist" id="checklist"></ul>
           </section>
@@ -882,6 +982,11 @@
                 <div class="memo-photo-strip" id="memoPhotoStrip"></div>
                 <button class="memo-add-photo-btn" id="memoAddPhotoBtn" type="button" aria-label="사진 추가">+</button>
                 <input id="memoImageInput" type="file" accept="image/*" hidden />
+              </div>
+
+              <div class="emotion-panel">
+                <h4 class="emotion-title">그날의 감정</h4>
+                <div class="emotion-list" id="emotionList"></div>
               </div>
             </div>
           </section>
@@ -933,6 +1038,12 @@
         { id: 1, title: '아침 산책', repeat: '매일', weather: 'sun' },
         { id: 2, title: '스트레칭', repeat: '주 5회', weather: 'cloud' },
         { id: 3, title: '독서 20분', repeat: '매일', weather: 'rain' }
+      ];
+      const emotionOptions = [
+        { id: 'happy', icon: '😀', label: '웃는 표정' },
+        { id: 'sad', icon: '😢', label: '우는 표정' },
+        { id: 'angry', icon: '😠', label: '화난 표정' },
+        { id: 'neutral', icon: '😐', label: '무표정' }
       ];
 
       const today = new Date();
@@ -1065,6 +1176,27 @@
         state[dateKey] = {
           ...(state[dateKey] || {}),
           memoImages: images,
+          tasks: state[dateKey]?.tasks || getTasksForDate(dateKey),
+          memo: state[dateKey]?.memo || ''
+        };
+        saveState(state);
+      }
+
+      function getEmotionsForDate(dateKey) {
+        const state = getStoredState();
+        const saved = state[dateKey]?.emotions;
+        return emotionOptions.reduce((emotions, emotion) => {
+          const value = Number(saved?.[emotion.id]);
+          emotions[emotion.id] = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 25;
+          return emotions;
+        }, {});
+      }
+
+      function setEmotionsForDate(dateKey, emotions) {
+        const state = getStoredState();
+        state[dateKey] = {
+          ...(state[dateKey] || {}),
+          emotions,
           tasks: state[dateKey]?.tasks || getTasksForDate(dateKey),
           memo: state[dateKey]?.memo || ''
         };
@@ -1228,7 +1360,48 @@
         memoCount.textContent = memoText.trim() ? '1개' : '0개';
 
         renderMemoImages();
+        renderEmotions();
         updateWeeklyProgress();
+      }
+
+      function renderEmotions() {
+        const key = makeDateKey(selectedDate);
+        const emotions = getEmotionsForDate(key);
+        const emotionList = document.getElementById('emotionList');
+
+        emotionList.innerHTML = emotionOptions
+          .map(
+            (emotion) => `
+              <label class="emotion-item" for="emotion-${emotion.id}">
+                <span class="emotion-icon" title="${emotion.label}" aria-hidden="true">${emotion.icon}</span>
+                <input class="emotion-slider" id="emotion-${emotion.id}" type="range" min="0" max="100" value="${emotions[emotion.id]}" data-emotion="${emotion.id}" style="${getEmotionSliderStyle(emotions[emotion.id])}" aria-label="${emotion.label} 비율" />
+                <output class="emotion-value" for="emotion-${emotion.id}">${emotions[emotion.id]}%</output>
+              </label>
+            `
+          )
+          .join('');
+
+        emotionList.querySelectorAll('.emotion-slider').forEach((slider) => {
+          slider.addEventListener('input', (event) => {
+            const emotionId = event.target.dataset.emotion;
+            const updatedEmotions = getEmotionsForDate(key);
+            updatedEmotions[emotionId] = Number(event.target.value);
+            setEmotionsForDate(key, updatedEmotions);
+            const sliderStyle = getEmotionSliderStyle(Number(event.target.value));
+            sliderStyle.split(';').forEach((property) => {
+              const [name, value] = property.split(':').map((part) => part.trim());
+              if (name && value) event.target.style.setProperty(name, value);
+            });
+            event.target.nextElementSibling.value = `${event.target.value}%`;
+          });
+        });
+      }
+
+      function getEmotionSliderStyle(value) {
+        const ratio = Math.max(0, Math.min(100, Number(value))) / 100;
+        const hue = 220;
+        const lightness = Math.round(78 - ratio * 36);
+        return `--emotion-level: ${Math.round(ratio * 100)}%; --emotion-hue: ${hue}; --emotion-lightness: ${lightness}%`;
       }
 
       function renderMemoEntryList() {
@@ -1290,9 +1463,12 @@
         memoPhotoStrip.innerHTML = images
           .map(
             (image, index) => `
-              <button class="memo-photo-thumb" type="button" data-index="${index}" aria-label="메모 사진 ${index + 1}">
-                <img src="${image}" alt="메모 사진 ${index + 1}" />
-              </button>
+              <div class="memo-photo-item">
+                <button class="memo-photo-thumb" type="button" data-index="${index}" aria-label="메모 사진 ${index + 1} 크게 보기">
+                  <img src="${image}" alt="메모 사진 ${index + 1}" />
+                </button>
+                <button class="memo-photo-remove" type="button" data-index="${index}" aria-label="메모 사진 ${index + 1} 삭제">×</button>
+              </div>
             `
           )
           .join('');
@@ -1304,6 +1480,16 @@
             const modalImg = document.getElementById('memoImageModalImg');
             modalImg.src = images[index];
             modal.classList.add('show');
+          });
+        });
+
+        memoPhotoStrip.querySelectorAll('.memo-photo-remove').forEach((button) => {
+          button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const index = Number(button.dataset.index);
+            const updatedImages = getMemoImagesForDate(key).filter((_, imageIndex) => imageIndex !== index);
+            setMemoImagesForDate(key, updatedImages);
+            renderMemoImages();
           });
         });
       }
@@ -1386,6 +1572,25 @@
       memoInput.addEventListener('input', (event) => {
         const key = makeDateKey(selectedDate);
         setMemoForDate(key, event.target.value);
+        renderChecklist();
+      });
+
+      document.getElementById('taskAddBtn').addEventListener('click', () => {
+        const title = window.prompt('추가할 할 일을 입력하세요.');
+        if (!title || !title.trim()) return;
+
+        const tag = window.prompt('카테고리를 입력하세요.', '기타');
+        const key = makeDateKey(selectedDate);
+        const tasks = getTasksForDate(key);
+        tasks.push({
+          id: Date.now(),
+          text: title.trim(),
+          tag: tag && tag.trim() ? tag.trim() : '기타',
+          done: false
+        });
+
+        setTasksForDate(key, tasks);
+        renderCalendar();
         renderChecklist();
       });
 
